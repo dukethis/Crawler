@@ -36,6 +36,7 @@ if __name__ == '__main__':
    print( "\n".join( res ) )
   else:
    res = req.find_all( args.tags )
+   res = [ str(x) for x in res ]
    print( "\n".join( res ) )
  else:
    print( req.prettify() )
