@@ -12,18 +12,29 @@ from bs4 import BeautifulSoup
 # ~ from signal import signal, SIGPIPE, SIG_DFL
 # ~ signal(SIGPIPE,SIG_DFL)
 
+#----------------
+# CRAWLER CLASS -
+#----------------
+
 class Crawler(urllib3.PoolManager):
 
-    def __init__(self, url=None, agent="Crawl-testing", **kargs):
+    def __init__(self, url=None, agent="WebCake/0.10", **kargs):
+
+        # Identify your crawler with a User-Agent
         self.agent = str(agent)
+
+        # Set up request headers
         HEADERS = { "User-Agent" : self.agent }
         HEADERS = HEADERS.update(kargs["headers"]) if "headers" in kargs.keys() else HEADERS
+
+        # Derived from urllib3.PoolManager
         urllib3.PoolManager.__init__(
             self,
             cert_reqs = 'CERT_REQUIRED',
             ca_certs  = certifi.where(),
             headers   = HEADERS
         )
+        # Basic HTTP parameters
         self.url      = url
         self.method   = kargs["method"]   if "method"   in kargs.keys() else "GET"
         self.redirect = kargs["redirect"] if "redirect" in kargs.keys() else 1
@@ -32,8 +43,32 @@ class Crawler(urllib3.PoolManager):
         self.response = None
         self.content  = None
         self.status   = None
+        self.rules    = None
+        
+    def get_rules(self,url):
+        URL = urllib3.util.parse_url(url)
+        URL = "://".join([ URL.scheme, URL.host ])+"/robots.txt"
+        req = self.GET( URL )
+        data = req.data.decode('utf-8').split('\n')
+        rules = []
+        start=0
+        for i,line in enumerate(data):
+            if line.startswith("User-agent: *") or line.startswith("User-agent: ") and line.count(self.agent):
+                start=1
+            elif start and (line.startswith("Allow:") or line.startswith("Disallow:") or line.startswith("Crawl-delay:")):
+                rules.append( line ) 
+            elif start and line.startswith("User-agent"):
+                start=0
+        self.rules = rules
+        return rules
 
+    def test(self,url):
+        if not self.rules: self.get_rules()
+        href = "/"+re.sub(".*/","",url)
+        return any([ x.replace('Disallow:','').strip()==href for x in self.rules if x.count("Disallow") ])
+         
     def HEAD(self, url):
+        """ Simple HEAD Request """
         req = self.request("HEAD", url)
         return json.dumps( dict(req.headers), indent=2 )
 
@@ -47,6 +82,11 @@ class Crawler(urllib3.PoolManager):
     def get(self, url=None, headers={}, verbose=0):
         """ User-friendly GET request
         """
+        if not self.rules:
+            print("Warning: no rules have been set. Please call the 'get_rules()' method.")
+        elif self.test(url):
+            print("Warning: this URL is not allowed.")
+            return
         req = self.GET(url)
         # DEFINE CONTENT-TYPE / CHARSET
         c_type  = req.headers["Content-Type"] if "Content-Type" in req.headers else None
@@ -78,12 +118,11 @@ class Crawler(urllib3.PoolManager):
             "request": {
                 "url"     : self.url,
                 "method"  : self.method,
-                "charset" : self.charset,
                 "headers" : self.headers
             },
             "response": {
-                "status"  : self.response.status if self.response else self.status,
-                "time"    : self.response.time if self.response else None,
+                "status"  : self.response.status        if self.response else self.status,
+                "time"    : self.response.time          if self.response else None,
                 "headers" : dict(self.response.headers) if self.response else {},
                 "body"    : self.content
             }
