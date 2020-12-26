@@ -54,6 +54,7 @@ class Crawler(urllib3.PoolManager):
         return "://".join( [url.scheme,url.host] )
         
     def get_rules(self,url):
+        """ Retrieve robots.txt rules """
         URL = urllib3.util.parse_url(url)
         URL = "://".join([ URL.scheme, URL.host ])+"/robots.txt"
         req = self.GET( URL )
@@ -71,6 +72,7 @@ class Crawler(urllib3.PoolManager):
         return rules
 
     def test(self,url):
+        """ Test a secific robots.txt rule """
         if not self.rules: self.get_rules()
         href = "/"+re.sub(".*/","",url)
         return any([ x.replace('Disallow:','').strip()==href for x in self.rules if x.count("Disallow") ])
@@ -83,6 +85,13 @@ class Crawler(urllib3.PoolManager):
 
     def GET(self, url):
         """ Raw GET request """
+        # robots.txt rules testing
+        if not self.rules:
+            print("Warning: no rules have been set. Please call the 'get_rules()' method.")
+        # block request when not allowed (see testing method)
+        elif self.test(url):
+            print("Warning: this URL is not allowed.")
+            return
         self.url = url
         try: req = self.request("GET", url)
         except Exception as e:
@@ -93,11 +102,6 @@ class Crawler(urllib3.PoolManager):
         """ User-friendly GET request
         """
         self.url = url
-        if not self.rules:
-            print("Warning: no rules have been set. Please call the 'get_rules()' method.")
-        elif self.test(url):
-            print("Warning: this URL is not allowed.")
-            return
         req = self.GET(url)
         # DEFINE CONTENT-TYPE / CHARSET
         c_type  = req.headers["Content-Type"] if "Content-Type" in req.headers else None
@@ -109,14 +113,15 @@ class Crawler(urllib3.PoolManager):
         # USE BEAUTIFULSOUP?
         if any([ c_type.count( x ) for x in ["html","rss","xml"]]):
             html_content = BeautifulSoup( text_content, "lxml" )
-            return html_content
+            self.content = html_content
         # OR JSON
         elif c_type.count("json"):
-            return json.dumps( eval(text_content), indent=2 )
+            self.content = json.dumps( eval(text_content), indent=2 )
         # OR RAW OUTPUT
         else:
-            return text_content
-    
+            self.content = text_content
+
+        return self.content
     
     def parse_tags(self, url, tags, attributes=[]):
         req = self.get(url)

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # coding: utf-8
-""" Crawler.py Class Interface
+""" Crawler.py Interface
 """
 
 import re, json
@@ -13,7 +13,7 @@ from argparse import ArgumentParser
 
 if __name__ == '__main__':
 
- ap = ArgumentParser()
+ ap = ArgumentParser("Simple Web Crawler")
  ap.add_argument('url', type=str)
  ap.add_argument('-t', '--tags',       type=str, nargs="*")
  ap.add_argument('-a', '--attributes', type=str, nargs="*")
@@ -21,15 +21,13 @@ if __name__ == '__main__':
  
  args = ap.parse_args()
  
- url = args.url
- 
  bot = Crawler()
 
- bot.get_rules( url )
+ bot.get_rules( args.url )
  
- req = bot.get(url)
+ req = bot.get( args.url )
  
- hrefs =  bot.parse_tags( url, args.tags, args.attributes)
+ hrefs = bot.parse_tags( args.url, args.tags, args.attributes)
  
  print( '\n'.join( hrefs ) )
  
