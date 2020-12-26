@@ -29,16 +29,9 @@ if __name__ == '__main__':
  
  req = bot.get(url)
  
- if args.tags:
-  if args.attributes:
-   res = req.find_all( args.tags )
-   res = [ x.get(attr) for x in res for attr in args.attributes if x.get(attr) ]
-   print( "\n".join( res ) )
-  else:
-   res = req.find_all( args.tags )
-   res = [ str(x) for x in res ]
-   print( "\n".join( res ) )
- else:
-   print( req.prettify() )
+ hrefs =  bot.parse_tags( url, args.tags, args.attributes)
+ 
+ print( '\n'.join( hrefs ) )
+ 
  
  

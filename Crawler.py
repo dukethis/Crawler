@@ -44,6 +44,14 @@ class Crawler(urllib3.PoolManager):
         self.content  = None
         self.status   = None
         self.rules    = None
+ 
+ 
+    @property
+    def host(self):
+        if not self.url:
+            raise Exception("Type error: URL is "+str(self.url))
+        url = urllib3.util.parse_url(self.url)
+        return "://".join( [url.scheme,url.host] )
         
     def get_rules(self,url):
         URL = urllib3.util.parse_url(url)
@@ -69,11 +77,13 @@ class Crawler(urllib3.PoolManager):
          
     def HEAD(self, url):
         """ Simple HEAD Request """
+        self.url = url
         req = self.request("HEAD", url)
         return json.dumps( dict(req.headers), indent=2 )
 
     def GET(self, url):
         """ Raw GET request """
+        self.url = url
         try: req = self.request("GET", url)
         except Exception as e:
             req = e
@@ -82,6 +92,7 @@ class Crawler(urllib3.PoolManager):
     def get(self, url=None, headers={}, verbose=0):
         """ User-friendly GET request
         """
+        self.url = url
         if not self.rules:
             print("Warning: no rules have been set. Please call the 'get_rules()' method.")
         elif self.test(url):
@@ -105,6 +116,18 @@ class Crawler(urllib3.PoolManager):
         # OR RAW OUTPUT
         else:
             return text_content
+    
+    
+    def parse_tags(self, url, tags, attributes=[]):
+        req = self.get(url)
+        if attributes:
+            res = req.find_all( tags )
+            res = [ url+'/'+ re.sub('^\.?\/?','',x.get(attr)) if attr=='href' and not x.get(attr).startswith('http') else x.get(attr) for x in res for attr in attributes if x.get(attr) ]
+            return res
+        else:
+            res = req.find_all( tags )
+            res = [ str(x) for x in res ]
+            return res
     
     def get_headers(self):
         return json.dumps( self.headers, indent=4 )
