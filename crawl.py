@@ -23,17 +23,20 @@ if __name__ == '__main__':
  
  bot = Crawler()
 
- bot.get_rules( args.url )
+ HOST = "https://dukeart.netlib.re"
+ URIS = ["/robots.txt", "/humans.txt", "/media/file/"]
+
+ tags = ["a"]
+ attributes = []
  
- print( bot.rules )
- print( args.url )
- 
- req = bot.get( args.url )
- 
- print(req)
- hrefs = bot.parse_tags( args.url, args.tags, args.attributes)
- 
- print( '\n'.join( hrefs ) )
- 
+ bot.get_rules( HOST )
+ print(HOST)
+
+ for uri in URIS:
+   url = HOST+uri
+   hrefs = bot.parse_tags( url, tags, attributes)
+   if type(hrefs)==list: print( '\n'.join( hrefs ) )
+   else:
+      print( hrefs )
  
  

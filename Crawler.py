@@ -3,9 +3,8 @@
 """ Minimalist Crawler project : KISS!!
 """
 
-import re,sys,json,time
+import re,sys,json,time,datetime
 import urllib3,certifi
-
 from bs4 import BeautifulSoup
 
 # ~ # TO AVOID BROKEN PIPES
@@ -43,8 +42,13 @@ class Crawler(urllib3.PoolManager):
         self.response = None
         self.content  = None
         self.status   = None
-        self.rules    = None
+        self.rules    = { "Crawl-delay":10 }
+        self.delay    = 10
+        self.log(f"Crawler {id(self)} starts")
  
+    def log(self, line):
+        ts = datetime.datetime.now().strftime("%m-%d %H:%M:%S")
+        sys.stdout.write(f"""{ts} {line}\n""")
  
     @property
     def host(self):
@@ -55,12 +59,14 @@ class Crawler(urllib3.PoolManager):
         
     def get_rules(self,url):
         """ Retrieve robots.txt rules """
+        tx = time.time()
         URL = urllib3.util.parse_url(url)
         URL = "://".join([ URL.scheme, URL.host ])+"/robots.txt"
         req = self.GET( URL )
         data = req.data.decode('utf-8').split('\n')
         rules = []
-        start=0
+        start = 0
+        self.log(f"Fetch rules from [{self.host}]")
         for i,line in enumerate(data):
             if line.startswith("User-agent: *") or line.startswith("User-agent: ") and line.count(self.agent):
                 start=1
@@ -69,6 +75,9 @@ class Crawler(urllib3.PoolManager):
             elif start and line.startswith("User-agent"):
                 start=0
         self.rules = rules
+        self.delay = max([ int(u.split(':')[1].strip()) for u in self.rules if u.lower().startswith("crawl-delay:")  ])
+        tx = time.time()-tx
+        self.log(f"Fetched {len(self.rules)} rules from [{self.host}] ({tx:.1f}s)")
         return rules
 
     def uri_testing(self,url):
@@ -87,11 +96,12 @@ class Crawler(urllib3.PoolManager):
     def GET(self, url):
         """ Raw GET request """
         # robots.txt rules testing
-        if not self.rules:
-            print("Warning: no rules have been set. Please call the 'get_rules()' method.")
+        if len(self.rules)==0:
+            self.log(f"Rules [{self.host}]")
+            self.get_rules()
         # block request when not allowed (see testing method)
-        elif self.uri_testing(url):
-            print("Warning: this URL is not allowed.")
+        if self.uri_testing(url):
+            self.log(f"Warning: this URL is not allowed [{url}]")
             sys.exit(1)
         self.url = url
         try: req = self.request("GET", url)
@@ -106,7 +116,6 @@ class Crawler(urllib3.PoolManager):
         - Store it in self.content
         - Return the content
         """
-        self.url = url
         req = self.GET(url)
         # DEFINE CONTENT-TYPE / CHARSET
         c_type  = req.headers["Content-Type"] if "Content-Type" in req.headers else None
@@ -126,7 +135,7 @@ class Crawler(urllib3.PoolManager):
         else:
             self.content = text_content
 
-        return self.content
+        return req
     
     def parse_tags(self, url, tags, attributes=[]):
         """ GET request and parse specific HTML 'tags' (eventually with specific 'attributes') 
@@ -135,9 +144,12 @@ class Crawler(urllib3.PoolManager):
         # Without attributes: whole tag is parsed as a string and returned 
         """
         req = self.get(url)
+        if not req.headers["Content-Type"].count("html"):
+            return self.content
+            
         if attributes:
             res = req.find_all( tags )
-            res = [ url+'/'+ re.sub('^\.?\/?','',x.get(attr)) if attr=='href' and not x.get(attr).startswith('http') else x.get(attr) for x in res for attr in attributes if x.get(attr) ]
+            res = [ re.sub("/$","",url) + re.sub('^[.]*','',x.get(attr)) if attr=='href' and not x.get(attr).startswith('http') else x.get(attr) for x in res for attr in attributes if x.get(attr) ]
             return res
         else:
             res = req.find_all( tags )
