@@ -25,8 +25,12 @@ if __name__ == '__main__':
 
  bot.get_rules( args.url )
  
+ print( bot.rules )
+ print( args.url )
+ 
  req = bot.get( args.url )
  
+ print(req)
  hrefs = bot.parse_tags( args.url, args.tags, args.attributes)
  
  print( '\n'.join( hrefs ) )

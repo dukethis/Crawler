@@ -71,10 +71,11 @@ class Crawler(urllib3.PoolManager):
         self.rules = rules
         return rules
 
-    def test(self,url):
+    def uri_testing(self,url):
         """ Test a secific robots.txt rule """
         if not self.rules: self.get_rules()
-        href = "/"+re.sub(".*/","",url)
+        href = urllib3.util.parse_url(url)
+        href = href.path
         return any([ x.replace('Disallow:','').strip()==href for x in self.rules if x.count("Disallow") ])
          
     def HEAD(self, url):
@@ -89,9 +90,9 @@ class Crawler(urllib3.PoolManager):
         if not self.rules:
             print("Warning: no rules have been set. Please call the 'get_rules()' method.")
         # block request when not allowed (see testing method)
-        elif self.test(url):
+        elif self.uri_testing(url):
             print("Warning: this URL is not allowed.")
-            return
+            sys.exit(1)
         self.url = url
         try: req = self.request("GET", url)
         except Exception as e:
@@ -100,6 +101,10 @@ class Crawler(urllib3.PoolManager):
         
     def get(self, url=None, headers={}, verbose=0):
         """ User-friendly GET request
+        - Address the correct Content-Type
+        - Parse the received content
+        - Store it in self.content
+        - Return the content
         """
         self.url = url
         req = self.GET(url)
@@ -124,6 +129,11 @@ class Crawler(urllib3.PoolManager):
         return self.content
     
     def parse_tags(self, url, tags, attributes=[]):
+        """ GET request and parse specific HTML 'tags' (eventually with specific 'attributes') 
+        # tags & attributes : <tag attribute1="value1">innerText</tag>
+        # With    attributes: it will be parsed and returned
+        # Without attributes: whole tag is parsed as a string and returned 
+        """
         req = self.get(url)
         if attributes:
             res = req.find_all( tags )
